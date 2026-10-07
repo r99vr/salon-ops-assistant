@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Readex Pro", system-ui, sans-serif;
+  --font-display: "El Messiri", "Readex Pro", serif;
+
+  --color-ink: #2b1d2e;
+  --color-ink-soft: #5c4b5f;
+  --color-ink-mute: #8d7f90;
+  --color-paper: #f7f4f6;
+  --color-surface: #ffffff;
+  --color-line: #e6dee4;
+  --color-line-strong: #d3c6cf;
+  --color-plum: #6b2d5c;
+  --color-plum-deep: #4f1f44;
+  --color-plum-wash: #f1e6ee;
+  --color-sage: #3e7c6b;
+  --color-sage-wash: #e3f0ec;
+  --color-amber: #c8811a;
+  --color-amber-wash: #fbf0de;
+  --color-alarm: #c23b4b;
+  --color-alarm-wash: #fbe7ea;
+
+  /* محاكي المحادثة */
+  --color-chat-bg: #ece5dd;
+  --color-chat-out: #dcf8c6;
+  --color-chat-in: #ffffff;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+body {
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum" 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-plum);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.chat-wallpaper {
+  background-color: var(--color-chat-bg);
+  background-image: radial-gradient(rgba(107, 45, 92, 0.05) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+.scroll-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: var(--color-line-strong);
+  border-radius: 6px;
+}
+
+@keyframes needle-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(107, 45, 92, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(107, 45, 92, 0);
+  }
+}
+.needle-dot {
+  animation: needle-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.bubble-in {
+  animation: bubble-in 0.22s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .needle-dot,
+  .bubble-in {
+    animation: none;
+  }
+}
