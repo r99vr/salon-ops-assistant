@@ -57,7 +57,7 @@ def build_context(db: Session, staff: Staff, today: date) -> Context:
             select(TaskRun)
             .join(CleaningTask)
             .where(TaskRun.run_date == today, TaskRun.status == "pending", CleaningTask.staff_id == staff.id)
-            .order_by(TaskRun.due_at)
+            .order_by(CleaningTask.sort, CleaningTask.id)
         )
     )
     suppliers = list(db.scalars(select(Supplier)))
@@ -114,7 +114,7 @@ def _catalog(ctx: Context) -> str:
 
 
 def _classify_ai(ctx: Context, text: str, image: Path | None) -> Classification:
-    runs = "\n".join(f"{r.id}: {r.task.title} (موعدها {r.due_at:%H:%M})" for r in ctx.pending_runs) or "لا يوجد"
+    runs = "\n".join(f"{r.id}: {r.task.title}" for r in ctx.pending_runs) or "لا يوجد"
     sections = "، ".join(s.name for s in ctx.staff.sections) or "بدون قسم"
     suppliers = "، ".join(s.name for s in ctx.suppliers)
     user = (
@@ -233,7 +233,7 @@ def _classify_rules(ctx: Context, text: str, image: Path | None) -> Classificati
             if scored and scored[0][0] >= 0.6:
                 run = scored[0][1]
         if not run:
-            # أقرب مهمة فات موعدها أو جاي
+            # بدون نص: أول مهمة معلقة في القائمة
             run = ctx.pending_runs[0]
         return Classification(type="task_proof", task_run_id=run.id, confidence=0.6)
 

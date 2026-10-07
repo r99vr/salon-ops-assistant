@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { api, refreshAll, useApi } from "@/lib/api";
-import { ORDER_STATUS, money, num, relative, shortDate, time } from "@/lib/format";
+import { ORDER_STATUS, clock12, money, num, relative, shortDate, time } from "@/lib/format";
 import type { Invoice, Order } from "@/lib/types";
 import { Button, Empty, PageHeader, Pill, SectionTitle, Thumb, useLightbox, useToast } from "@/components/ui";
 
@@ -44,11 +44,11 @@ export default function Orders() {
     <>
       <PageHeader
         title="الطلبيات"
-        sub={`النواقص تتجمع طول اليوم، والساعة ${data.summary_time} يوصلك ملخص واحد بالواتساب. ما ينرسل شي للمندوب إلا بعد موافقتك.`}
+        sub={`النواقص تتجمع طول اليوم، والساعة ${clock12(data.summary_time)} يوصلك ملخص واحد بالواتساب. ما ينرسل شي للمندوب إلا بعد موافقتك.`}
       />
 
       <section>
-        <SectionTitle aside={awaiting.length ? "بانتظار موافقتك" : `الملخص الساعة ${data.summary_time}`}>طلبية الليلة</SectionTitle>
+        <SectionTitle aside={awaiting.length ? "بانتظار موافقتك" : `الملخص الساعة ${clock12(data.summary_time)}`}>طلبية الليلة</SectionTitle>
         {tonight.length === 0 ? (
           <Empty title="ما فيه أصناف للطلب">الأصناف اللي تنزل تحت الحد الأدنى تنضاف هنا تلقائياً.</Empty>
         ) : (
@@ -81,7 +81,7 @@ export default function Orders() {
                   موافقة وإرسال للمندوب
                 </Button>
               ) : (
-                <Pill>تنتظر ملخص {data.summary_time}</Pill>
+                <Pill>تنتظر ملخص {clock12(data.summary_time)}</Pill>
               )}
             </div>
           </div>

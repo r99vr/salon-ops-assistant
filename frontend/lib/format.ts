@@ -70,3 +70,10 @@ export const ORDER_STATUS: Record<string, string> = {
   received: "استُلمت",
   cancelled: "ملغاة",
 };
+
+/** "18:00" ← "6:00 م" */
+export function clock12(hhmm?: string | null) {
+  if (!hhmm) return "";
+  const [h, m] = hhmm.split(":").map(Number);
+  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h < 12 ? "ص" : "م"}`;
+}

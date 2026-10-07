@@ -7,6 +7,7 @@ export type Salon = {
   summary_time: string;
   morning_time: string;
   tasks_time: string;
+  tasks_check_time: string;
   supplier_reminder_minutes: number;
   cleaning_grace_minutes: number;
   timezone: string;
@@ -39,7 +40,6 @@ export type Run = {
   task_id: number;
   title: string;
   date: string;
-  due_at: string;
   status: "pending" | "overdue" | "done" | "missed";
   done_at: string | null;
   proof_url: string | null;
@@ -114,7 +114,6 @@ export type Overview = {
   open_orders: Order[];
   spend_series: { date: string; total: number }[];
   task_week: { date: string; done: number; total: number }[];
-  activity: Msg[];
   alerts: Msg[];
 };
 

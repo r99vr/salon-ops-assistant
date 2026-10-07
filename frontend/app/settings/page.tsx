@@ -54,6 +54,8 @@ export default function Settings() {
     <>
       <PageHeader title="الإعدادات" sub="كل شي هنا بيانات مو كود: نفس النظام يشتغل لكوفي أو مغسلة بتغيير الأقسام والأصناف والمهام." />
 
+      <NameField value={salon.name} onSave={(v) => patch({ name: v }, "تغيّر اسم الصالون")} />
+
       <div className="grid gap-12 lg:grid-cols-2">
         <section>
           <SectionTitle>قناة الرسائل</SectionTitle>
@@ -117,10 +119,11 @@ export default function Settings() {
           </div>
           <div className="divide-y divide-line rounded-2xl bg-surface ring-1 ring-line">
             <TimeRow label="تقرير الصباح" hint="رسالة وحدة فيها النواقص والمهام والأعطال والمصاريف" value={salon.morning_time} onSave={(v) => patch({ morning_time: v })} />
-            <TimeRow label="مهام النظافة اليومية" hint="تنرسل لعاملة النظافة" value={salon.tasks_time} onSave={(v) => patch({ tasks_time: v })} />
+            <TimeRow label="قائمة النظافة اليومية" hint="تنرسل لعاملة النظافة" value={salon.tasks_time} onSave={(v) => patch({ tasks_time: v })} />
+            <TimeRow label="مراجعة مهام النظافة" hint="يذكّر العاملة باللي باقي من القائمة" value={salon.tasks_check_time} onSave={(v) => patch({ tasks_check_time: v })} />
             <TimeRow label="ملخص الطلبية" hint="للموافقة قبل ما تروح للمندوب" value={salon.summary_time} onSave={(v) => patch({ summary_time: v })} />
             <NumRow label="تذكير المندوب بعد" unit="دقيقة" value={salon.supplier_reminder_minutes} onSave={(v) => patch({ supplier_reminder_minutes: v })} />
-            <NumRow label="مهلة مهمة النظافة قبل تبليغك" unit="دقيقة" value={salon.cleaning_grace_minutes} onSave={(v) => patch({ cleaning_grace_minutes: v })} />
+            <NumRow label="مهلة بعد المراجعة قبل تبليغك" unit="دقيقة" value={salon.cleaning_grace_minutes} onSave={(v) => patch({ cleaning_grace_minutes: v })} />
           </div>
         </section>
       </div>
@@ -189,6 +192,28 @@ export default function Settings() {
       {invite && <InviteModal {...invite} onClose={() => setInvite(null)} onCopied={() => toast.ok("نُسخ الرابط")} />}
       {toast.node}
     </>
+  );
+}
+
+function NameField({ value, onSave }: { value: string; onSave: (v: string) => void }) {
+  const [v, setV] = useState(value);
+  useEffect(() => setV(value), [value]);
+  const save = () => v.trim() && v.trim() !== value && onSave(v.trim());
+  return (
+    <section className="mb-10 max-w-xl">
+      <label htmlFor="salon-name" className="mb-1.5 block text-[14.5px] font-medium">
+        اسم الصالون
+      </label>
+      <input
+        id="salon-name"
+        value={v}
+        onChange={(e) => setV(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
+        className="w-full rounded-xl bg-surface px-4 py-2.5 font-display text-[20px] text-plum ring-1 ring-line outline-none focus:ring-plum"
+      />
+      <p className="mt-1.5 text-[12.5px] text-ink-mute">يظهر في اللوحة وفي رسائل المساعد للمناديب. غيّره لاسم صالون العميل قبل العرض.</p>
+    </section>
   );
 }
 

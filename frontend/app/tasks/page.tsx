@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Check, Pencil, Plus, Trash2 } from "lucide-react";
 import { api, refreshAll, useApi } from "@/lib/api";
-import { shortDate, time } from "@/lib/format";
-import type { Run, Staff } from "@/lib/types";
+import { clock12, shortDate, time } from "@/lib/format";
+import type { Run, Salon, Staff } from "@/lib/types";
 import { Button, Empty, PageHeader, Pill, SectionTitle, Thumb, useLightbox, useToast } from "@/components/ui";
 
-type Template = { id: number; title: string; due_time: string; days: string; staff_id: number | null; staff: string | null; aliases: string };
+type Template = { id: number; title: string; days: string; staff_id: number | null; staff: string | null; aliases: string };
 type TasksData = { date: string; runs: Run[]; templates: Template[]; history: { date: string; done: number; missed: number; total: number }[] };
 
 // ترتيب الأسبوع السعودي (الأحد أولاً) بأرقام weekday() في بايثون
@@ -25,24 +25,25 @@ const STATUS: Record<Run["status"], { t: string; tone: "sage" | "alarm" | "mute"
   done: { t: "تمت", tone: "sage" },
   overdue: { t: "متأخرة", tone: "alarm" },
   missed: { t: "فاتت", tone: "alarm" },
-  pending: { t: "لم يحن وقتها", tone: "mute" },
+  pending: { t: "باقية", tone: "mute" },
 };
 
 export default function Tasks() {
   const { data } = useApi<TasksData>("/api/tasks", 8000);
-  const { data: settings } = useApi<{ staff: Staff[] }>("/api/settings");
+  const { data: settings } = useApi<{ staff: Staff[]; salon: Salon }>("/api/settings");
   const lb = useLightbox();
   const toast = useToast();
   const [editing, setEditing] = useState<Template | "new" | null>(null);
 
   if (!data) return <div className="py-24 text-center text-ink-mute">جاري التحميل…</div>;
   const done = data.runs.filter((r) => r.status === "done").length;
+  const checkTime = settings?.salon?.tasks_check_time;
 
   return (
     <>
       <PageHeader
         title="مهام النظافة"
-        sub="المساعد يرسل لعاملة النظافة مهامها كل صباح، وكل مهمة تنقفل بصورة. إذا فات وقتها يذكّرها، وبعد المهلة يبلغك."
+        sub={`قائمة يومية بدون مواعيد: المساعد يرسلها لعاملة النظافة الصبح، وكل مهمة تنقفل بصورة. الساعة ${clock12(checkTime) || "6:00 م"} يذكّرها باللي باقي، وإذا ما خلصت يبلغك.`}
       />
 
       <div className="grid gap-10 lg:grid-cols-[1.3fr_1fr]">
@@ -51,31 +52,34 @@ export default function Tasks() {
           {data.runs.length === 0 ? (
             <Empty title="ما فيه مهام اليوم">أضف مهمة من الجدول.</Empty>
           ) : (
-            <ol className="relative border-r-2 border-line pr-6 space-y-5">
-              {data.runs.map((r) => (
-                <li key={r.id} className="relative">
-                  <span
-                    className={`absolute -right-[33px] top-1.5 size-4 rounded-full ring-4 ring-paper ${
-                      r.status === "done" ? "bg-sage" : r.status === "pending" ? "bg-line-strong" : "bg-alarm"
-                    }`}
-                  />
-                  <div className="flex items-start gap-3">
+            <ul className="divide-y divide-line rounded-2xl bg-surface ring-1 ring-line">
+              {data.runs.map((r) => {
+                const isDone = r.status === "done";
+                return (
+                  <li key={r.id} className="flex items-center gap-3 px-4 py-3">
+                    <span
+                      aria-hidden
+                      className={`grid size-6 shrink-0 place-items-center rounded-md ring-2 ${
+                        isDone ? "bg-sage text-white ring-sage" : r.status === "pending" ? "ring-line-strong" : "ring-alarm"
+                      }`}
+                    >
+                      {isDone && <Check size={15} strokeWidth={3} />}
+                    </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-[13px] text-ink-mute w-16">{time(r.due_at)}</span>
-                        <span className="text-[15.5px]">{r.title}</span>
-                        <Pill tone={STATUS[r.status].tone}>{STATUS[r.status].t}</Pill>
+                        <span className={`text-[15px] ${isDone ? "text-ink-soft" : ""}`}>{r.title}</span>
+                        {!isDone && r.status !== "pending" && <Pill tone={STATUS[r.status].tone}>{STATUS[r.status].t}</Pill>}
                       </div>
-                      <div className="mt-1 pr-[72px] text-[12.5px] text-ink-mute space-x-3 space-x-reverse">
+                      <div className="mt-0.5 text-[12.5px] text-ink-mute space-x-3 space-x-reverse">
                         {r.done_at && <span>قُفلت {time(r.done_at)}</span>}
-                        {r.reminded_at && <span>تذكير {time(r.reminded_at)}</span>}
-                        {r.escalated_at && <span className="text-alarm">بُلّغت الإدارة {time(r.escalated_at)}</span>}
-                        {r.staff && !r.done_at && <span>المسؤولة: {r.staff}</span>}
+                        {r.reminded_at && !isDone && <span>ذكّرها {time(r.reminded_at)}</span>}
+                        {r.escalated_at && !isDone && <span className="text-alarm">بُلّغت الإدارة {time(r.escalated_at)}</span>}
+                        {r.staff && !r.done_at && !r.reminded_at && <span>المسؤولة: {r.staff}</span>}
                       </div>
                     </div>
                     {r.proof_url ? (
-                      <Thumb src={r.proof_url} alt={`إثبات ${r.title}`} size={52} onOpen={lb.open} />
-                    ) : r.status !== "done" ? (
+                      <Thumb src={r.proof_url} alt={`إثبات ${r.title}`} size={48} onOpen={lb.open} />
+                    ) : !isDone ? (
                       <Button
                         variant="quiet"
                         className="px-3 py-1.5 text-[13px]"
@@ -87,10 +91,10 @@ export default function Tasks() {
                         قفلها يدوياً
                       </Button>
                     ) : null}
-                  </div>
-                </li>
-              ))}
-            </ol>
+                  </li>
+                );
+              })}
+            </ul>
           )}
 
           <div className="mt-10">
@@ -124,7 +128,7 @@ export default function Tasks() {
               </Button>
             }
           >
-            الجدول
+            قائمة المهام
           </SectionTitle>
           {editing === "new" && <TemplateForm staff={settings?.staff ?? []} onClose={() => setEditing(null)} onSaved={() => toast.ok("أُضيفت المهمة")} />}
           <ul className="divide-y divide-line rounded-2xl bg-surface ring-1 ring-line">
@@ -135,7 +139,6 @@ export default function Tasks() {
                 </li>
               ) : (
                 <li key={t.id} className="flex items-center gap-3 px-4 py-3">
-                  <span className="w-14 text-[13.5px] font-medium text-plum">{t.due_time}</span>
                   <div className="min-w-0 flex-1">
                     <div className="text-[14.5px]">{t.title}</div>
                     <div className="text-[12px] text-ink-mute">
@@ -148,7 +151,7 @@ export default function Tasks() {
                   </button>
                   <button
                     onClick={async () => {
-                      if (!confirm(`حذف «${t.title}» من الجدول؟`)) return;
+                      if (!confirm(`حذف «${t.title}» من القائمة؟`)) return;
                       await api(`/api/tasks/${t.id}`, "DELETE");
                       refreshAll();
                     }}
@@ -172,7 +175,6 @@ export default function Tasks() {
 function TemplateForm({ initial, staff, onClose, onSaved }: { initial?: Template; staff: Staff[]; onClose: () => void; onSaved: () => void }) {
   const cleaner = staff.find((s) => s.sections.some((x) => x.includes("نظاف")));
   const [title, setTitle] = useState(initial?.title ?? "");
-  const [due, setDue] = useState(initial?.due_time ?? "12:00");
   const [days, setDays] = useState(initial?.days ?? "0123456");
   const [staffId, setStaffId] = useState<number | null>(initial?.staff_id ?? cleaner?.id ?? null);
   const [busy, setBusy] = useState(false);
@@ -181,7 +183,7 @@ function TemplateForm({ initial, staff, onClose, onSaved }: { initial?: Template
     e.preventDefault();
     if (!title.trim()) return;
     setBusy(true);
-    const body = { title: title.trim(), due_time: due, days, staff_id: staffId, aliases: initial?.aliases ?? "" };
+    const body = { title: title.trim(), days, staff_id: staffId, aliases: initial?.aliases ?? "" };
     if (initial) await api(`/api/tasks/${initial.id}`, "PATCH", body);
     else await api("/api/tasks", "POST", body);
     setBusy(false);
@@ -192,16 +194,15 @@ function TemplateForm({ initial, staff, onClose, onSaved }: { initial?: Template
 
   return (
     <form onSubmit={save} className="mb-3 space-y-3 rounded-2xl bg-plum-wash/50 p-4">
-      <div className="grid grid-cols-[1fr_110px] gap-2">
+      <div>
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="اسم المهمة، مثل: تعقيم أحواض الغسيل"
-          className="rounded-lg bg-surface px-3 py-2 text-[14.5px] ring-1 ring-line outline-none focus:ring-plum"
+          className="w-full rounded-lg bg-surface px-3 py-2 text-[14.5px] ring-1 ring-line outline-none focus:ring-plum"
           aria-label="اسم المهمة"
           autoFocus
         />
-        <input type="time" value={due} onChange={(e) => setDue(e.target.value)} className="rounded-lg bg-surface px-2 py-2 text-[14px] ring-1 ring-line" aria-label="الوقت" />
       </div>
       <div className="flex flex-wrap gap-1.5">
         {WEEK.map((w) => {

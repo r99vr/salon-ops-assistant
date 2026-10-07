@@ -50,7 +50,7 @@ def item(name):
 
 def test_overview_and_seed(client):
     o = client.get("/api/overview").json()
-    assert o["salon"]["name"] == "صالون رونق"
+    assert o["salon"]["name"] == "صالون التجميل"
     names = {i["name"] for i in o["low_items"]}
     assert {"سيروم شعر", "مطهر أدوات"} <= names
     assert len(o["spend_series"]) == 14
@@ -167,3 +167,24 @@ def test_new_topic_after_question_is_not_merged(client):
     assert "وش هذي الصورة" in r
     msg, r = say(client, SARA, "الاستشوار الثاني ما يسخن")
     assert msg["kind"] == "issue" and "استشوار 2" in r
+
+
+def test_cleaning_check_waits_for_check_time(client):
+    """بدون زر العرض: ما فيه تذكير قبل وقت المراجعة."""
+    from app import cleaning
+    from app.db import session_scope
+    from app.models import Salon
+    from datetime import time as dtime
+
+    with session_scope() as db:
+        db.query(Salon).one().tasks_check_time = dtime(23, 59)
+    with session_scope() as db:
+        res = cleaning.check_overdue(db)
+    assert res == {"reminded": 0, "escalated": 0}
+
+
+def test_new_task_joins_today_list(client):
+    r = client.post("/api/tasks", json={"title": "تعقيم أحواض الغسيل", "days": "0123456", "staff_id": None})
+    assert r.status_code == 200
+    titles = [x["title"] for x in client.get("/api/tasks").json()["runs"]]
+    assert titles[-1] == "تعقيم أحواض الغسيل"

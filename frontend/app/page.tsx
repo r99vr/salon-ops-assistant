@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { api, mediaUrl, refreshAll, useApi } from "@/lib/api";
-import { KIND_LABEL, ORDER_STATUS, dayLabel, money, num, relative, shortDate, time } from "@/lib/format";
+import { api, refreshAll, useApi } from "@/lib/api";
+import { ORDER_STATUS, clock12, dayLabel, money, num, relative, shortDate } from "@/lib/format";
 import type { Overview } from "@/lib/types";
 import DayRibbon from "@/components/DayRibbon";
-import { Avatar, Button, Empty, LevelBar, Pill, SectionTitle, count, useLightbox, useToast } from "@/components/ui";
+import { Button, Empty, LevelBar, Pill, SectionTitle, count, useLightbox, useToast } from "@/components/ui";
 
 export default function Home() {
   const { data, error } = useApi<Overview>("/api/overview", 8000);
@@ -50,12 +50,10 @@ export default function Home() {
         <p className="mt-1.5 text-[15.5px] text-ink-soft">{headline.join("، ")}.</p>
       </div>
 
-      <section className="rounded-3xl bg-surface px-5 sm:px-7 pt-5 pb-3 ring-1 ring-line" aria-labelledby="day-title">
-        <div className="mb-1 flex flex-wrap items-baseline justify-between gap-3">
+      <section className="rounded-3xl bg-surface px-5 sm:px-7 pt-5 pb-5 ring-1 ring-line" aria-labelledby="day-title">
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-3">
           <h2 id="day-title" className="text-[21px]">يوم الصالون</h2>
-          <div className="text-[13.5px] text-ink-soft">
-            تمت <b className="font-semibold text-sage">{stats.tasks_done}</b> من {stats.tasks_total} مهام نظافة، وكل حبة مكتملة فيها صورة الإثبات
-          </div>
+          <div className="text-[13px] text-ink-mute">كل مهمة نظافة تنقفل بصورة، اضغط عليها تشوف الإثبات</div>
         </div>
         <DayRibbon runs={data.today_tasks} salon={salon} now={data.now} onOpen={lb.open} />
       </section>
@@ -87,7 +85,7 @@ export default function Home() {
         </section>
 
         <section>
-          <SectionTitle aside={`الملخص يوصل الساعة ${salon.summary_time}`}>طلبية الليلة</SectionTitle>
+          <SectionTitle aside={`الملخص يوصل الساعة ${clock12(salon.summary_time)}`}>طلبية الليلة</SectionTitle>
           {tonight.length === 0 ? (
             <Empty title="ما فيه شي للطلب الليلة">الأصناف اللي تنزل تحت الحد تنضاف هنا تلقائياً.</Empty>
           ) : (
@@ -167,41 +165,12 @@ export default function Home() {
         </section>
       </div>
 
-      <div className="mt-12 grid gap-10 lg:grid-cols-[1.35fr_1fr]">
-        <section>
-          <SectionTitle aside={<Link href="/simulator" className="text-plum hover:underline">افتح المحاكي</Link>}>آخر رسائل الفريق</SectionTitle>
-          {data.activity.length === 0 ? (
-            <Empty title="ما وصلت رسائل بعد" />
-          ) : (
-            <ul className="space-y-4">
-              {data.activity.map((m) => (
-                <li key={m.id} className="flex gap-3">
-                  <Avatar name={m.name} color={m.role === "supplier" ? "teal" : m.role === "owner" ? "plum" : "rose"} size={36} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2 text-[13px]">
-                      <b className="font-medium text-[14px]">{m.name}</b>
-                      {m.kind && <Pill tone={m.kind === "issue" ? "alarm" : m.kind === "shortage" ? "amber" : m.kind === "task_proof" ? "sage" : "mute"}>{KIND_LABEL[m.kind] ?? m.kind}</Pill>}
-                      <span className="text-ink-mute">{relative(m.created_at)}</span>
-                    </div>
-                    <div className="mt-0.5 flex items-center gap-2 text-[14.5px] text-ink-soft">
-                      {m.media_url && (
-                        <button type="button" onClick={() => lb.open(m.media_url!)} className="shrink-0 overflow-hidden rounded-md ring-1 ring-line">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={mediaUrl(m.media_url)} alt="" className="size-9 object-cover" />
-                        </button>
-                      )}
-                      <span className="line-clamp-2">{m.body || "📷 صورة"}</span>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
+      <div className="mt-12 grid gap-10 lg:grid-cols-2">
         <section>
           <SectionTitle aside={`هذا الشهر: ${money(stats.month_spend)} ${salon.currency}`}>المصاريف</SectionTitle>
           <SpendChart series={data.spend_series} currency={salon.currency} />
+        </section>
+        <section>
           <TaskWeek week={data.task_week} />
         </section>
       </div>
@@ -260,8 +229,8 @@ function SpendChart({ series, currency }: { series: { date: string; total: numbe
 
 function TaskWeek({ week }: { week: { date: string; done: number; total: number }[] }) {
   return (
-    <div className="mt-8">
-      <h3 className="mb-2 text-[17px]">التزام النظافة هذا الأسبوع</h3>
+    <div>
+      <SectionTitle>التزام النظافة هذا الأسبوع</SectionTitle>
       <div className="flex gap-2">
         {week.map((d) => {
           const pct = d.total ? d.done / d.total : 0;

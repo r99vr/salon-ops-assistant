@@ -35,7 +35,9 @@ class Salon(Base):
     morning_time: Mapped[time] = mapped_column(Time, default=time(8, 0))
     tasks_time: Mapped[time] = mapped_column(Time, default=time(9, 0))
     supplier_reminder_minutes: Mapped[int] = mapped_column(Integer, default=120)
-    cleaning_grace_minutes: Mapped[int] = mapped_column(Integer, default=30)
+    # مهام النظافة قائمة بدون أوقات: وقت واحد يراجع فيه المساعد اللي ما خلص، ثم مهلة قبل تبليغ الإدارة
+    tasks_check_time: Mapped[time] = mapped_column(Time, default=time(18, 0))
+    cleaning_grace_minutes: Mapped[int] = mapped_column(Integer, default=60)
     currency: Mapped[str] = mapped_column(String(10), default="ريال")
     # القناة الحية: simulator / telegram / whatsapp
     channel: Mapped[str] = mapped_column(String(20), default="simulator")
@@ -153,7 +155,7 @@ class CleaningTask(Base):
     salon_id: Mapped[int] = mapped_column(ForeignKey("salon.id"))
     title: Mapped[str] = mapped_column(String(120))
     aliases: Mapped[str] = mapped_column(Text, default="")
-    due_time: Mapped[time] = mapped_column(Time)
+    sort: Mapped[int] = mapped_column(Integer, default=0)
     # أيام التنفيذ بصيغة أرقام weekday() في بايثون (0=الاثنين ... 6=الأحد)
     days: Mapped[str] = mapped_column(String(20), default="0123456")
     staff_id: Mapped[int | None] = mapped_column(ForeignKey("staff.id"), nullable=True)
@@ -168,7 +170,6 @@ class TaskRun(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     task_id: Mapped[int] = mapped_column(ForeignKey("cleaning_task.id"))
     run_date: Mapped[date] = mapped_column(Date, index=True)
-    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     # pending / done / missed
     status: Mapped[str] = mapped_column(String(20), default="pending")
     done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

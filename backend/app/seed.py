@@ -1,4 +1,4 @@
-"""بيانات صالون تجريبي كامل — «صالون رونق».
+"""بيانات صالون تجريبي كامل — «صالون التجميل» (الاسم يتغير من الإعدادات).
 
 كل شي هنا بيانات: لو بغينا كوفي أو مغسلة نكتب ملف seed ثاني بنفس الشكل بدون تغيير الكود.
 التواريخ نسبية لوقت التشغيل عشان العرض يطلع «حي» في أي يوم.
@@ -108,14 +108,14 @@ SECTIONS = [
 ]
 
 TASKS = [
-    # title, aliases, due, days (weekday: 0=Mon..6=Sun)
-    ("تعقيم أدوات البديكير", "تعقيم,الادوات,ادوات البديكير,عقمت", time(10, 0), "0123456"),
-    ("تنظيف فرش المكياج", "الفرش,فرش المكياج,غسلت الفرش", time(11, 30), "0123456"),
-    ("تعقيم الكراسي والأسطح", "الكراسي,الاسطح,مسحت الكراسي", time(13, 0), "0123456"),
-    ("تبديل المناشف وغسلها", "المناشف,الغسيل,بدلت المناشف", time(15, 0), "0123456"),
-    ("تنظيف الأرضيات", "الارضيات,البلاط,مسحت الارض", time(17, 0), "0123456"),
-    ("تعطير الصالون", "التعطير,عطرت,المعطر", time(18, 30), "0123456"),
-    ("تنظيف نهاية اليوم", "نهاية اليوم,التقفيل,قفلت", time(21, 30), "0123456"),
+    # title, aliases, days (weekday: 0=Mon..6=Sun) — الترتيب هنا هو ترتيب القائمة
+    ("تعقيم أدوات البديكير", "تعقيم,الادوات,ادوات البديكير,عقمت", "0123456"),
+    ("تنظيف فرش المكياج", "الفرش,فرش المكياج,غسلت الفرش", "0123456"),
+    ("تعقيم الكراسي والأسطح", "الكراسي,الاسطح,مسحت الكراسي", "0123456"),
+    ("تبديل المناشف وغسلها", "المناشف,الغسيل,بدلت المناشف", "0123456"),
+    ("تنظيف الأرضيات", "الارضيات,البلاط,مسحت الارض", "0123456"),
+    ("تعطير الصالون", "التعطير,عطرت,المعطر", "0123456"),
+    ("تنظيف نهاية اليوم", "نهاية اليوم,التقفيل,قفلت", "0123456"),
 ]
 
 
@@ -131,7 +131,7 @@ def seed(db: Session) -> None:
     t_now = now()
     today = t_now.date()
 
-    salon = Salon(name="صالون رونق", channel=settings.default_channel)
+    salon = Salon(name="صالون التجميل", channel=settings.default_channel)
     db.add(salon)
     db.flush()
 
@@ -168,8 +168,8 @@ def seed(db: Session) -> None:
 
     cleaner = staff["966500000015"]
     tasks = []
-    for title, aliases, due, days in TASKS:
-        t = CleaningTask(salon_id=salon.id, title=title, aliases=aliases, due_time=due, days=days, staff_id=cleaner.id)
+    for idx, (title, aliases, days) in enumerate(TASKS):
+        t = CleaningTask(salon_id=salon.id, title=title, aliases=aliases, sort=idx, days=days, staff_id=cleaner.id)
         db.add(t)
         tasks.append(t)
     db.flush()
@@ -206,32 +206,35 @@ def _seed_task_history(db: Session, tasks, rnd, t_now) -> None:
     today = t_now.date()
     for back in range(13, 0, -1):
         day = today - timedelta(days=back)
+        # المهام تنقفل على مدار اليوم بالترتيب من 10 الصباح لين 10 الليل تقريباً
+        minute = 10 * 60
         for t in tasks:
-            due = _at(day, t.due_time.hour, t.due_time.minute)
-            r = TaskRun(task_id=t.id, run_date=day, due_at=due)
+            minute += rnd.randint(50, 120)
+            done_at = _at(day, min(minute // 60, 23), minute % 60)
+            r = TaskRun(task_id=t.id, run_date=day)
             roll = rnd.random()
-            if roll < 0.88:
-                r.status = "done"
-                r.done_at = due + timedelta(minutes=rnd.randint(-20, 25))
-                r.proof_url = _proof_image(t.title)
-            elif roll < 0.95:
-                r.status = "done"
-                r.reminded_at = due
-                r.done_at = due + timedelta(minutes=rnd.randint(35, 70))
-                r.proof_url = _proof_image(t.title)
+            if roll < 0.9:
+                r.status, r.done_at, r.proof_url = "done", done_at, _proof_image(t.title)
             else:
                 r.status = "missed"
-                r.reminded_at = due
-                r.escalated_at = due + timedelta(minutes=30)
+                r.reminded_at = _at(day, 18)
+                r.escalated_at = _at(day, 19)
             db.add(r)
     db.flush()
-    # اليوم: اللي فات وقته بساعة تقريباً تم، والباقي معلق
+    # اليوم: العاملة خلصت جزء من القائمة حسب الوقت الحالي
     ensure_runs(db, today)
-    for r in db.query(TaskRun).filter(TaskRun.run_date == today):
-        if r.due_at < t_now - timedelta(minutes=45):
-            r.status = "done"
-            r.done_at = r.due_at + timedelta(minutes=rnd.randint(-15, 15))
-            r.proof_url = _proof_image(r.task.title)
+    runs = (
+        db.query(TaskRun).join(CleaningTask).filter(TaskRun.run_date == today)
+        .order_by(CleaningTask.sort).all()
+    )
+    hours_in = max(0.0, (t_now.hour * 60 + t_now.minute - 10 * 60) / 60)
+    done_count = min(len(runs) - 2, int(hours_in / 1.6)) if hours_in > 0 else 0
+    minute = 10 * 60
+    for r in runs[: max(done_count, 0)]:
+        minute += rnd.randint(40, 90)
+        r.status = "done"
+        r.done_at = min(_at(today, minute // 60, minute % 60), t_now - timedelta(minutes=5))
+        r.proof_url = _proof_image(r.task.title)
 
 
 def _seed_orders_and_invoices(db, salon, suppliers, items, staff, t_now) -> None:
@@ -329,7 +332,7 @@ def _seed_today_conversations(db, items, staff, suppliers, t_now) -> None:
 
     sup = suppliers["lamsa"]
     _msg(db, sup.rep_phone, sup.rep_name, "supplier", "out",
-         "السلام عليكم أبو فهد،\nطلبية جديدة من صالون رونق:\n\n  • بلسم احترافي × 3 لتر\n  • كريم أساس × 4 علبة\n\nنرجو تأكيد الطلب وموعد التوصيل بالرد على هذي الرسالة. شكراً 🌷",
+         "السلام عليكم أبو فهد،\nطلبية جديدة من صالون التجميل:\n\n  • بلسم احترافي × 3 لتر\n  • كريم أساس × 4 علبة\n\nنرجو تأكيد الطلب وموعد التوصيل بالرد على هذي الرسالة. شكراً 🌷",
          "order", _at(yday - timedelta(days=1), 20, 6))
     _msg(db, sup.rep_phone, sup.rep_name, "supplier", "in", "تم، يوصلكم بكرة الظهر إن شاء الله", "supplier_reply",
          _at(yday - timedelta(days=1), 20, 41))

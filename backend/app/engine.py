@@ -180,7 +180,6 @@ def _on_task_proof(db: Session, msg: Message, staff: Staff, c: Classification, m
     run.proof_url = media
     run.message_id = msg.id
     db.flush()
-    late = run.done_at > run.due_at + timedelta(minutes=15)
     remaining = list(
         db.scalars(
             select(TaskRun)
@@ -191,12 +190,12 @@ def _on_task_proof(db: Session, msg: Message, staff: Staff, c: Classification, m
                 TaskRun.id != run.id,
                 CleaningTask.staff_id == staff.id,
             )
-            .order_by(TaskRun.due_at)
+            .order_by(CleaningTask.sort, CleaningTask.id)
         )
     )
-    body = f"تم ✅ قفلت مهمة «{run.task.title}» الساعة {run.done_at:%H:%M}" + (" (متأخرة شوي)" if late else " 👏")
+    body = f"تم ✅ قفلت مهمة «{run.task.title}» 👏"
     if remaining:
-        body += "\nالباقي لك اليوم:\n" + "\n".join(f"  • {r.task.title} — {r.due_at:%H:%M}" for r in remaining)
+        body += "\nالباقي لك اليوم:\n" + "\n".join(f"  ☐ {r.task.title}" for r in remaining)
     else:
         body += "\nخلصتي كل مهام اليوم، يعطيك العافية 🌟"
     reply(body, meta={"task_run_id": run.id})

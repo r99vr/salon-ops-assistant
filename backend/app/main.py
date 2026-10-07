@@ -35,9 +35,31 @@ def prepare_media() -> None:
             shutil.copy(p, media / p.name)
 
 
+def schema_outdated() -> bool:
+    """هل جداول قاعدة البيانات أقدم من الكود؟ (عمود ناقص أو جدول ناقص)
+
+    مشروع عرض ببيانات وهمية: لو تغير الشكل نعيد بناء البيانات بدل ملفات migration.
+    مع عميل حقيقي نستخدم Alembic بدل هذا.
+    """
+    insp = inspect(engine)
+    existing = set(insp.get_table_names())
+    if not existing:
+        return False
+    for table in Base.metadata.sorted_tables:
+        if table.name not in existing:
+            return True
+        cols = {c["name"] for c in insp.get_columns(table.name)}
+        if {c.name for c in table.columns} - cols:
+            return True
+    return False
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     prepare_media()
+    if schema_outdated():
+        log.warning("شكل قاعدة البيانات قديم — إعادة بناء بيانات العرض")
+        reset_database()
     Base.metadata.create_all(engine)
     with session_scope() as db:
         empty = db.scalar(select(Salon).limit(1)) is None

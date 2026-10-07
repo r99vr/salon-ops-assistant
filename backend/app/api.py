@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from . import orders as orders_svc
 from . import scheduler
-from .cleaning import ensure_runs
+from .cleaning import ensure_runs, today_runs
 from .config import get_settings
 from .db import get_db, now
 from .engine import handle_inbound, resolve_device
@@ -83,13 +83,13 @@ def supplier_out(s: Supplier) -> dict:
 
 
 def run_out(r: TaskRun) -> dict:
-    t = now()
     status = r.status
-    if status == "pending" and t > r.due_at:
+    # بعد التذكير (وقت المراجعة) المهمة المفتوحة تعتبر متأخرة
+    if status == "pending" and r.reminded_at:
         status = "overdue"
     return {
         "id": r.id, "task_id": r.task_id, "title": r.task.title, "date": r.run_date.isoformat(),
-        "due_at": ts(r.due_at), "status": status, "done_at": ts(r.done_at), "proof_url": r.proof_url,
+        "status": status, "done_at": ts(r.done_at), "proof_url": r.proof_url,
         "reminded_at": ts(r.reminded_at), "escalated_at": ts(r.escalated_at),
         "staff": r.task.staff.name if r.task.staff else None,
     }
@@ -134,6 +134,7 @@ def salon_out(s: Salon) -> dict:
         "summary_time": s.summary_time.strftime("%H:%M"), "morning_time": s.morning_time.strftime("%H:%M"),
         "tasks_time": s.tasks_time.strftime("%H:%M"), "supplier_reminder_minutes": s.supplier_reminder_minutes,
         "cleaning_grace_minutes": s.cleaning_grace_minutes,
+        "tasks_check_time": s.tasks_check_time.strftime("%H:%M"),
         "timezone": settings.timezone,
     }
 
@@ -150,7 +151,7 @@ def overview(db: Session = Depends(get_db)):
     low = sorted([i for i in consumables if i.is_low], key=lambda i: float(i.quantity / (i.min_qty or 1)))
     devices = list(db.scalars(select(Item).where(Item.kind == "device")))
     broken = [d for d in devices if d.status == "broken"]
-    runs = list(db.scalars(select(TaskRun).where(TaskRun.run_date == today).order_by(TaskRun.due_at)))
+    runs = today_runs(db, today)
     open_orders = list(db.scalars(select(Order).where(Order.status.in_(orders_svc.OPEN_STATES)).order_by(Order.id)))
 
     start = today - timedelta(days=13)
@@ -168,12 +169,8 @@ def overview(db: Session = Depends(get_db)):
     for d in range(6, -1, -1):
         day = today - timedelta(days=d)
         rs = list(db.scalars(select(TaskRun).where(TaskRun.run_date == day)))
-        due = [r for r in rs if r.due_at <= t or r.status == "done"]
-        week.append({"date": day.isoformat(), "done": sum(r.status == "done" for r in rs), "total": len(due)})
+        week.append({"date": day.isoformat(), "done": sum(r.status == "done" for r in rs), "total": len(rs)})
 
-    activity = list(db.scalars(
-        select(Message).where(Message.direction == "in").order_by(Message.created_at.desc()).limit(10)
-    ))
     alerts = list(db.scalars(
         select(Message).where(Message.kind.in_(("alert", "summary", "report"))).order_by(Message.created_at.desc()).limit(6)
     ))
@@ -193,7 +190,6 @@ def overview(db: Session = Depends(get_db)):
         "open_orders": [order_out(o) for o in open_orders],
         "spend_series": spend_series,
         "task_week": week,
-        "activity": [message_out(m) for m in activity],
         "alerts": [message_out(m) for m in alerts],
     }
 
@@ -309,8 +305,10 @@ def tasks(day: date | None = None, db: Session = Depends(get_db)):
     if day == now().date():
         ensure_runs(db, day)
         db.commit()
-    runs = list(db.scalars(select(TaskRun).where(TaskRun.run_date == day).order_by(TaskRun.due_at)))
-    templates = list(db.scalars(select(CleaningTask).where(CleaningTask.active.is_(True)).order_by(CleaningTask.due_time)))
+    runs = today_runs(db, day)
+    templates = list(
+        db.scalars(select(CleaningTask).where(CleaningTask.active.is_(True)).order_by(CleaningTask.sort, CleaningTask.id))
+    )
     history = []
     for d in range(13, -1, -1):
         dd = now().date() - timedelta(days=d)
@@ -321,7 +319,7 @@ def tasks(day: date | None = None, db: Session = Depends(get_db)):
         "date": day.isoformat(),
         "runs": [run_out(r) for r in runs],
         "templates": [
-            {"id": t.id, "title": t.title, "due_time": t.due_time.strftime("%H:%M"), "days": t.days,
+            {"id": t.id, "title": t.title, "days": t.days,
              "staff_id": t.staff_id, "staff": t.staff.name if t.staff else None, "aliases": t.aliases}
             for t in templates
         ],
@@ -331,7 +329,6 @@ def tasks(day: date | None = None, db: Session = Depends(get_db)):
 
 class TaskIn(BaseModel):
     title: str
-    due_time: str
     days: str = "0123456"
     staff_id: int | None = None
     aliases: str = ""
@@ -340,9 +337,13 @@ class TaskIn(BaseModel):
 @router.post("/tasks")
 def create_task(body: TaskIn, db: Session = Depends(get_db)):
     s = orders_svc.salon(db)
-    t = CleaningTask(salon_id=s.id, title=body.title, due_time=time.fromisoformat(body.due_time), days=body.days,
+    last = db.scalar(select(func.coalesce(func.max(CleaningTask.sort), 0)))
+    t = CleaningTask(salon_id=s.id, title=body.title, sort=last + 1, days=body.days,
                      staff_id=body.staff_id, aliases=body.aliases)
     db.add(t)
+    db.flush()
+    # تنضاف لقائمة اليوم مباشرة إذا اليوم من أيامها
+    ensure_runs(db, now().date())
     db.commit()
     return {"id": t.id}
 
@@ -351,10 +352,6 @@ def create_task(body: TaskIn, db: Session = Depends(get_db)):
 def update_task(task_id: int, body: TaskIn, db: Session = Depends(get_db)):
     t = db.get(CleaningTask, task_id) or _404()
     t.title, t.days, t.staff_id, t.aliases = body.title, body.days, body.staff_id, body.aliases
-    t.due_time = time.fromisoformat(body.due_time)
-    # تحديث موعد اليوم إذا لسا معلق
-    for r in db.scalars(select(TaskRun).where(TaskRun.task_id == t.id, TaskRun.run_date == now().date(), TaskRun.status == "pending")):
-        r.due_at = datetime.combine(r.run_date, t.due_time, tzinfo=settings.tz)
     db.commit()
     return {"ok": True}
 
@@ -459,13 +456,14 @@ def get_settings_api(db: Session = Depends(get_db)):
     }
 
 
-class SalonPatch(BaseModel):
+class SalonPatch(BaseModel):  # noqa: D101
     name: str | None = None
     approver: str | None = None
     channel: str | None = None
     summary_time: str | None = None
     morning_time: str | None = None
     tasks_time: str | None = None
+    tasks_check_time: str | None = None
     supplier_reminder_minutes: int | None = None
     cleaning_grace_minutes: int | None = None
 

@@ -53,7 +53,7 @@ def invoice(name, supplier, cr, phone, no, lines, color, seed):
     d.text((70, 60), "TAX INVOICE", font=font(30, "600SemiBold"), fill=(255, 255, 255))
 
     rtl(d, (W - 70, 240), "فاتورة ضريبية مبسطة", font(40, "700Bold"), (40, 40, 40))
-    info = [("رقم الفاتورة", no), ("التاريخ", date.today().strftime("%Y-%m-%d")), ("العميل", "صالون رونق"), ("طريقة الدفع", "آجل")]
+    info = [("رقم الفاتورة", no), ("التاريخ", date.today().strftime("%Y-%m-%d")), ("العميل", "صالون التجميل"), ("طريقة الدفع", "آجل")]
     y = 320
     for k, v in info:
         rtl(d, (W - 70, y), f"{k}:", font(28, "600SemiBold"), (90, 90, 90))
