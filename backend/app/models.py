@@ -18,6 +18,7 @@ from sqlalchemy import (
     String,
     Text,
     Time,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -280,3 +281,23 @@ class JobLog(Base):
     run_date: Mapped[date] = mapped_column(Date, primary_key=True)
     ran_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     manual: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class Attendance(Base):
+    """تحضير العاملات: المديرة ترسل للمساعد مين وصلت ومين طلعت."""
+
+    __tablename__ = "attendance"
+    __table_args__ = (UniqueConstraint("staff_id", "work_date", name="uq_attendance_day"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    staff_id: Mapped[int] = mapped_column(ForeignKey("staff.id"))
+    work_date: Mapped[date] = mapped_column(Date, index=True)
+    # present / absent
+    status: Mapped[str] = mapped_column(String(20), default="present")
+    check_in: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    check_out: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    recorded_by: Mapped[int | None] = mapped_column(ForeignKey("staff.id"), nullable=True)
+    message_id: Mapped[int | None] = mapped_column(ForeignKey("message.id"), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+    staff: Mapped["Staff"] = relationship(foreign_keys=[staff_id])
+    recorder: Mapped["Staff | None"] = relationship(foreign_keys=[recorded_by])

@@ -14,6 +14,7 @@ from .cleaning import ensure_runs
 from .config import get_settings
 from .db import Base, engine, now, session_scope
 from .models import (
+    Attendance,
     CleaningTask,
     DeviceIssue,
     Invoice,
@@ -177,6 +178,7 @@ def seed(db: Session) -> None:
     _seed_task_history(db, tasks, rnd, t_now)
     _seed_orders_and_invoices(db, salon, suppliers, items, staff, t_now)
     _seed_device_history(db, items, staff, t_now)
+    _seed_attendance(db, staff, rnd, t_now)
     _seed_today_conversations(db, items, staff, suppliers, t_now)
     db.flush()
 
@@ -278,6 +280,31 @@ def _seed_orders_and_invoices(db, salon, suppliers, items, staff, t_now) -> None
                 uploaded_by=staff[uploader].id, extraction="ai", created_at=_at(day, 13, 12),
             )
         )
+
+
+def _seed_attendance(db, staff, rnd, t_now) -> None:
+    """حضور أسبوعين تسجله دانة، واليوم حسب الوقت الحالي (الصالون يفتح 10 الصبح تقريباً)."""
+    manager = staff["966500000002"]
+    worker_list = [s for s in staff.values() if s.role == "worker"]
+    today = t_now.date()
+    for back in range(13, -1, -1):
+        day = today - timedelta(days=back)
+        for w in worker_list:
+            arrive = _at(day, 9, 40) + timedelta(minutes=rnd.randint(-15, 45))
+            leave = _at(day, 21, 30) + timedelta(minutes=rnd.randint(-40, 60))
+            if back == 0:
+                if t_now < arrive:
+                    continue
+                db.add(Attendance(staff_id=w.id, work_date=day, status="present", check_in=arrive,
+                                  check_out=leave if t_now > leave else None, recorded_by=manager.id,
+                                  updated_at=arrive))
+                continue
+            if rnd.random() < 0.06:
+                db.add(Attendance(staff_id=w.id, work_date=day, status="absent", recorded_by=manager.id,
+                                  updated_at=_at(day, 10, 30)))
+            else:
+                db.add(Attendance(staff_id=w.id, work_date=day, status="present", check_in=arrive,
+                                  check_out=leave, recorded_by=manager.id, updated_at=leave))
 
 
 def _seed_device_history(db, items, staff, t_now) -> None:

@@ -5,6 +5,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from . import attendance
 from .db import now
 from .messaging import send
 from .models import Invoice, Item, Order, TaskRun
@@ -36,6 +37,9 @@ def morning_report(db: Session) -> dict:
     if runs:
         parts.append(f"\n🧽 مهام أمس: {len(done)} من {len(runs)} تمت")
         parts += [f"  ✗ {r.task.title} ({r.task.staff.name if r.task.staff else '-'})" for r in missed[:5]]
+    att = attendance.report_line(db, yday)
+    if att:
+        parts.append("\n" + att)
     if broken:
         parts.append(f"\n🔧 أجهزة معطلة ({len(broken)}):")
         parts += [f"  • {d.name} — {d.section.name}" for d in broken]

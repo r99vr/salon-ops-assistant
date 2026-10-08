@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Boxes, ClipboardCheck, House, MessagesSquare, Settings2, Truck } from "lucide-react";
+import { Boxes, ClipboardCheck, House, MessagesSquare, Settings2, Truck, UserCheck } from "lucide-react";
 import { useApi } from "@/lib/api";
 import type { Overview } from "@/lib/types";
 import { setTimezone } from "@/lib/format";
@@ -11,6 +11,7 @@ const NAV = [
   { href: "/", label: "الرئيسية", icon: House },
   { href: "/inventory", label: "المخزون", icon: Boxes },
   { href: "/tasks", label: "مهام النظافة", icon: ClipboardCheck },
+  { href: "/attendance", label: "الحضور", icon: UserCheck },
   { href: "/orders", label: "الطلبيات", icon: Truck },
   { href: "/simulator", label: "المحاكي", icon: MessagesSquare },
   { href: "/settings", label: "الإعدادات", icon: Settings2 },
@@ -82,7 +83,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       </div>
 
       <nav
-        className="lg:hidden fixed bottom-0 inset-x-0 z-30 grid grid-cols-6 border-t border-line bg-surface/95 backdrop-blur pb-[env(safe-area-inset-bottom)]"
+        className="lg:hidden fixed bottom-0 inset-x-0 z-30 grid grid-cols-7 border-t border-line bg-surface/95 backdrop-blur pb-[env(safe-area-inset-bottom)]"
         aria-label="الأقسام"
       >
         {NAV.map(({ href, label, icon: Icon }) => (
@@ -90,7 +91,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             key={href}
             href={href}
             aria-current={active(href) ? "page" : undefined}
-            className={`flex flex-col items-center gap-1 py-2 text-[10.5px] ${active(href) ? "text-plum" : "text-ink-mute"}`}
+            className={`flex flex-col items-center gap-1 py-2 text-[9.5px] ${active(href) ? "text-plum" : "text-ink-mute"}`}
           >
             <Icon size={20} strokeWidth={1.8} aria-hidden />
             {label}

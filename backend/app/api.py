@@ -12,11 +12,13 @@ from sqlalchemy.orm import Session
 
 from . import orders as orders_svc
 from . import scheduler
+from . import attendance as attendance_svc
 from .cleaning import ensure_runs, today_runs
 from .config import get_settings
 from .db import get_db, now
 from .engine import handle_inbound, resolve_device
 from .models import (
+    Attendance,
     CleaningTask,
     DeviceIssue,
     Invoice,
@@ -139,6 +141,25 @@ def salon_out(s: Salon) -> dict:
     }
 
 
+def attendance_rows(db: Session, day: date) -> list[dict]:
+    rows = {a.staff_id: a for a in db.scalars(select(Attendance).where(Attendance.work_date == day))}
+    out = []
+    for st in attendance_svc.workers(db):
+        a = rows.get(st.id)
+        mins = None
+        if a and a.check_in and a.check_out:
+            mins = max(0, int((a.check_out - a.check_in).total_seconds() // 60))
+        status = "none"
+        if a:
+            status = "absent" if a.status == "absent" else ("left" if a.check_out else "present")
+        out.append({
+            "staff_id": st.id, "name": st.name, "title": st.title, "color": st.color, "status": status,
+            "check_in": ts(a.check_in) if a else None, "check_out": ts(a.check_out) if a else None,
+            "minutes": mins, "recorded_by": a.recorder.name if a and a.recorder else None,
+        })
+    return out
+
+
 # ------------------------------------------------------------- overview
 @router.get("/overview")
 def overview(db: Session = Depends(get_db)):
@@ -187,6 +208,7 @@ def overview(db: Session = Depends(get_db)):
             {**item_out(d), "issue": _open_issue(db, d)} for d in broken
         ],
         "today_tasks": [run_out(r) for r in runs],
+        "attendance": attendance_rows(db, today),
         "open_orders": [order_out(o) for o in open_orders],
         "spend_series": spend_series,
         "task_week": week,
@@ -296,6 +318,20 @@ def device_issues(db: Session = Depends(get_db)):
          "created_at": ts(i.created_at), "resolved_at": ts(i.resolved_at), "image_url": i.image_url}
         for i in rows
     ]
+
+
+# ----------------------------------------------------------- attendance
+@router.get("/attendance")
+def attendance_page(days: int = 7, db: Session = Depends(get_db)):
+    today = now().date()
+    days = max(1, min(days, 31))
+    history = []
+    for d in range(days - 1, -1, -1):
+        day = today - timedelta(days=d)
+        history.append({"date": day.isoformat(), "rows": attendance_rows(db, day)})
+    manager = db.scalar(select(Staff).where(Staff.role == "manager"))
+    return {"today": attendance_rows(db, today), "history": history,
+            "recorder": manager.name if manager else None}
 
 
 # ---------------------------------------------------------------- tasks

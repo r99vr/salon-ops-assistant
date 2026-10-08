@@ -6,6 +6,7 @@ import { api, refreshAll, useApi } from "@/lib/api";
 import { ORDER_STATUS, clock12, dayLabel, money, num, relative, shortDate } from "@/lib/format";
 import type { Overview } from "@/lib/types";
 import DayRibbon from "@/components/DayRibbon";
+import { AttendanceToday, attendanceCounts } from "@/components/Attendance";
 import { Button, Empty, LevelBar, Pill, SectionTitle, count, useLightbox, useToast } from "@/components/ui";
 
 export default function Home() {
@@ -82,6 +83,27 @@ export default function Home() {
               ))}
             </ul>
           )}
+
+          <div className="mt-10">
+            <SectionTitle
+              aside={
+                <Link href="/attendance" className="text-plum hover:underline">
+                  سجل الحضور
+                </Link>
+              }
+            >
+              الحضور اليوم
+            </SectionTitle>
+            <p className="-mt-1.5 mb-2 text-[13px] text-ink-mute">
+              {(() => {
+                const c = attendanceCounts(data.attendance);
+                return c.arrived === 0 && c.absent === 0
+                  ? "ما سجلت المديرة أحد للحين."
+                  : `وصلت ${c.arrived} من ${c.total}${c.absent ? `، وغياب ${c.absent}` : ""}. تسجلها المديرة برسالة للمساعد.`;
+              })()}
+            </p>
+            <AttendanceToday rows={data.attendance} />
+          </div>
         </section>
 
         <section>

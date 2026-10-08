@@ -111,6 +111,7 @@ export type Overview = {
   low_items: Item[];
   broken_devices: Item[];
   today_tasks: Run[];
+  attendance: AttendanceRow[];
   open_orders: Order[];
   spend_series: { date: string; total: number }[];
   task_week: { date: string; done: number; total: number }[];
@@ -157,4 +158,16 @@ export type Contact = {
   role: Msg["role"];
   color: string;
   last: Msg | null;
+};
+
+export type AttendanceRow = {
+  staff_id: number;
+  name: string;
+  title: string;
+  color: string;
+  status: "present" | "left" | "absent" | "none";
+  check_in: string | null;
+  check_out: string | null;
+  minutes: number | null;
+  recorded_by: string | null;
 };

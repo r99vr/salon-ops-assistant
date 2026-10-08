@@ -7,6 +7,7 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from . import attendance
 from . import textnorm as tn
 from .classifier import Classification, build_context, classify
 from .config import get_settings
@@ -70,6 +71,14 @@ def handle_inbound(db: Session, phone: str, text: str = "", media_url: str | Non
         _handle_supplier(db, msg, contact, reply)
         return msg
 
+    if role in ("owner", "manager") and not msg.media_url:
+        answer = attendance.handle(db, msg.body, contact, msg.id)
+        if answer:
+            msg.kind = "attendance"
+            msg.meta = {**msg.meta, "classification": {"type": "attendance", "source": "rules", "confidence": 1}}
+            reply(answer)
+            return msg
+
     if role in ("owner", "manager") and _handle_approver(db, msg, contact, reply):
         return msg
 
@@ -126,6 +135,15 @@ def _handle_staff(db: Session, msg: Message, staff: Staff, reply) -> None:
     }.get(c.type)
     if handler:
         handler(db, msg, staff, c, media, reply)
+    elif staff.role in ("owner", "manager"):
+        reply(
+            f"أهلاً {staff.name} 🌷 أقدر أسجل لك:\n"
+            "• الحضور: «نورة وصلت» أو «وصلت ريم وهيا» أو «الكل وصل»\n"
+            "• الخروج: «سارة طلعت» أو «طلعت مريم 10 الليل»\n"
+            "• الغياب: «هيا غايبة اليوم»\n"
+            "• وتسألين: «مين حاضر؟»",
+            kind="reply",
+        )
     else:
         reply(
             f"أهلاً {staff.name} 🌷 أنا مساعد الصالون. أرسلي لي:\n"

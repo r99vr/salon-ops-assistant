@@ -188,3 +188,55 @@ def test_new_task_joins_today_list(client):
     assert r.status_code == 200
     titles = [x["title"] for x in client.get("/api/tasks").json()["runs"]]
     assert titles[-1] == "تعقيم أحواض الغسيل"
+
+
+MANAGER = "966500000002"
+
+
+def _clear_today_attendance():
+    from app.db import now, session_scope
+    from app.models import Attendance
+
+    with session_scope() as db:
+        db.query(Attendance).filter(Attendance.work_date == now().date()).delete()
+
+
+def _att(client, name):
+    return next(r for r in client.get("/api/attendance").json()["today"] if r["name"] == name)
+
+
+def test_attendance_check_in_out_absent(client):
+    _clear_today_attendance()
+    msg, r = say(client, MANAGER, "وصلت نورة وريم")
+    assert msg["kind"] == "attendance" and "نورة" in r and "ريم" in r and "باقي ما وصلن" in r
+    assert _att(client, "نورة")["status"] == "present"
+    _, r = say(client, MANAGER, "نورة طلعت")
+    assert "سجلت خروج" in r
+    assert _att(client, "نورة")["status"] == "left"
+    _, r = say(client, MANAGER, "هيا غايبة اليوم")
+    assert "غياب" in r and _att(client, "هيا")["status"] == "absent"
+    _, r = say(client, MANAGER, "الكل وصل")
+    assert "سارة" in r and "مريم" in r
+    assert _att(client, "ريم")["status"] == "present"
+    _, r = say(client, MANAGER, "مين حاضر؟")
+    assert "الحضور اليوم" in r
+
+
+def test_attendance_time_parsing():
+    from datetime import date
+
+    from app.attendance import _parse_time
+
+    d = date(2026, 10, 8)
+    assert _parse_time("سارة وصلت 9:30", d).hour == 9
+    assert _parse_time("طلعت مريم الساعة 10 الليل", d).hour == 22
+    assert _parse_time("طلعت 4", d).hour == 16
+    assert _parse_time("وصلت 11 الصبح", d).hour == 11
+    assert _parse_time("نورة وصلت", d) is None
+
+
+def test_owner_commands_still_work_with_attendance(client):
+    say(client, SARA, "خلصت الصبغة البنية")
+    client.post("/api/demo/run/summary")
+    _, r = say(client, OWNER, "موافقة")
+    assert "أرسلت الطلبية" in r

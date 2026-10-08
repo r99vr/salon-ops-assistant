@@ -50,6 +50,7 @@ export const KIND_LABEL: Record<string, string> = {
   issue: "عطل",
   invoice: "فاتورة",
   owner_command: "أمر",
+  attendance: "تحضير",
   supplier_reply: "رد المندوب",
   other: "عام",
   summary: "ملخص الطلبية",

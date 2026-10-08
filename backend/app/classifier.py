@@ -20,7 +20,7 @@ from .models import CleaningTask, Item, Section, Staff, Supplier, TaskRun
 log = logging.getLogger("salon.classifier")
 settings = get_settings()
 
-TYPES = ("shortage", "task_proof", "issue", "invoice", "other")
+TYPES = ("shortage", "task_proof", "issue", "invoice", "other")  # «attendance» يُعالج قبل التصنيف
 
 
 @dataclass

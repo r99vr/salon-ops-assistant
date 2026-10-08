@@ -138,7 +138,8 @@ export default function Simulator() {
 }
 
 function suggestions(contact: Contact, sections: Section[]): string[] {
-  if (contact.role === "owner" || contact.role === "manager") return ["موافقة", "شيل مطهر الأدوات", "الصبغة البنية 8", "انصلح استشوار 2"];
+  if (contact.role === "manager") return ["وصلت نورة وريم", "الكل وصل", "هيا غايبة اليوم", "طلعت سارة", "مين حاضر؟"];
+  if (contact.role === "owner") return ["موافقة", "شيل مطهر الأدوات", "الصبغة البنية 8", "انصلح استشوار 2"];
   if (contact.role === "supplier") return ["تم، يوصلكم بكرة العصر", "الصنف الثاني بيتأخر يومين"];
   const own = sections.filter((s) => s.staff?.name === contact.name);
   const items = own.flatMap((s) => s.items);
@@ -348,7 +349,6 @@ function Bubble({ m, mine, onOpen, localImage }: { m: Msg; mine: boolean; onOpen
       {mine && c && c.type && (
         <div className="mt-1 px-1 text-[11.5px] text-ink-mute">
           فهمها المساعد: <span className="text-plum">{KIND_LABEL[c.type] ?? c.type}</span>
-          {c.source === "ai" ? " بالذكاء الاصطناعي" : " بالقواعد النصية"}
         </div>
       )}
     </div>
