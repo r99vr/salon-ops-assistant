@@ -277,7 +277,7 @@ def _seed_orders_and_invoices(db, salon, suppliers, items, staff, t_now) -> None
             Invoice(
                 salon_id=salon.id, supplier_id=sp.id, supplier_name=sp.name, invoice_no=inv_no,
                 total=total + vat, invoice_date=day, lines=inv_lines, order_id=o.id,
-                uploaded_by=staff[uploader].id, extraction="ai", created_at=_at(day, 13, 12),
+                uploaded_by=staff[uploader].id, extraction="matched", created_at=_at(day, 13, 12),
             )
         )
 
